@@ -13,7 +13,7 @@
 // game/index.html offline, no library, no request leaving the machine.
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
@@ -34,16 +34,26 @@ const DOSSIER_LIMITS = {
   game_path_max_bytes: 1000,
 };
 
+// The grader refuses any output path that is not a plain relative
+// name: a dotfile mirrored into the output (screenshots/.gitkeep, left
+// over from creating the folder on GitHub) fails its run_completes
+// check outright. Keep every staged copy free of dotfiles and dot
+// folders, so a placeholder the repository happens to carry can never
+// reach the output again.
+function keepVisibleEntry(sourcePath) {
+  return !basename(sourcePath).startsWith('.');
+}
+
 function mirrorIfPresent(sourceDir, targetDir) {
   mkdirSync(targetDir, { recursive: true });
   if (existsSync(sourceDir)) {
-    cpSync(sourceDir, targetDir, { recursive: true });
+    cpSync(sourceDir, targetDir, { recursive: true, filter: keepVisibleEntry });
   }
 }
 
 function stageEntry() {
   mkdirSync(OUTPUT_DIR, { recursive: true });
-  cpSync(join(REPO_ROOT, 'game'), join(OUTPUT_DIR, 'game'), { recursive: true });
+  cpSync(join(REPO_ROOT, 'game'), join(OUTPUT_DIR, 'game'), { recursive: true, filter: keepVisibleEntry });
   mirrorIfPresent(join(REPO_ROOT, 'screenshots'), join(OUTPUT_DIR, 'screenshots'));
   writeFileSync(
     join(OUTPUT_DIR, 'dossier.json'),
